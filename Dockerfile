@@ -1,19 +1,27 @@
 FROM php:8.1-cli
 
-#setting working dir
+# تثبيت المكتبات المطلوبة
+RUN apt-get update && apt-get install -y \
+    git \
+    zip \
+    unzip \
+    libzip-dev \
+    && docker-php-ext-install zip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-#install composer 
+# نسخ Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-#install all project files
+# نسخ ملفات المشروع
 COPY . .
 
-#iNSTALL DEPENDENCIES
-RUN composer install
+# تثبيت المكتبات
+RUN composer install --no-dev --optimize-autoloader
 
-#Expose port
+# تشغيل التطبيق
+CMD ["php", "-S", "0.0.0.0:8000", "-t", "."]
+
 EXPOSE 8000
-
-#start php server
-CMD [ "php", "-S", "0.0.0.0:8000", "-t", "public" ]
