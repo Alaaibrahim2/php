@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_CRED = credentials('docker-cred')
+    }
+
+    options {
+        buildDiscarder(logRotator(
+            daysToKeepStr: '30',
+            numToKeepStr: '2'
+        ))
+    }
+
+    stages {
+        stage('Checkout Stage') {
+            steps {
+                checkout scmGit(
+                    branches: [[name: '*/main']],
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/Alaaibrahim2/php.git'
+                    ]]
+                )
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t alaai/php .'
+            }
+        }
+
+        stage('Check AWS CLI Version') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'aws-cred']]) {
+                    sh '''
+                        echo "Using AWS CLI:"
+                        aws --version
+                        aws sts get-caller-identity
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to EKS') {
+            steps {
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding',
+                                  credentialsId: 'aws-cred']]) {
+                    sh '''
+                        echo "Updating kubeconfig for EKS..."
+                        aws eks update-kubeconfig --region eu-north-1 --name php-cluster
+
+                        echo "Deploying eks.yaml to EKS..."
+                        kubectl apply -f eks.yaml
+                    '''
+                }
+            }
+        }
+    }
+}
